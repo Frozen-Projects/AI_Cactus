@@ -11,14 +11,13 @@ void UCactusSubsystem::Deinitialize()
 {
 	if (Cactus_Context.IsValid())
 	{
-		//Cactus_Context->releaseMultimodal();
 		Cactus_Context.Reset();
 	}
 
 	Super::Deinitialize();
 }
 
-bool UCactusSubsystem::Init_Cactus(int32 NumberThreads)
+bool UCactusSubsystem::Init_Cactus(int32 NumberThreads, const FString& AntiPrompt)
 {
 	if (Cactus_Context.IsValid())
 	{
@@ -54,7 +53,7 @@ bool UCactusSubsystem::Init_Cactus(int32 NumberThreads)
 		this->Cactus_Params.sampling.top_p = 0.9f;
 		this->Cactus_Params.sampling.penalty_repeat = 1.1f;
 
-		this->Cactus_Params.antiprompt.push_back("<|im_end|>");
+		this->Cactus_Params.antiprompt.push_back(TCHAR_TO_UTF8(*AntiPrompt));
 
 		this->Cactus_Context = MakeShared<cactus_context, ESPMode::ThreadSafe>();
 
@@ -90,34 +89,51 @@ FString UCactusSubsystem::GetModelPath() const
 	return this->Model_Path;
 }
 
-void UCactusSubsystem::GenerateText(FDelegateCactus DelegateCactus, FString Input, int32 MaxTokens)
+void UCactusSubsystem::GenerateText(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens)
 {
 	if (!Cactus_Context.IsValid())
 	{
-		DelegateCactus.ExecuteIfBound(false, TEXT("Cactus context is not initialized."));
+		DelegateCactus.ExecuteIfBound(false, TEXT("Cactus Context is not valid !"), -1, -1, -1);
 		return;
 	}
 
 	if (Input.IsEmpty())
 	{
-		DelegateCactus.ExecuteIfBound(false, TEXT("Input text is empty."));
+		DelegateCactus.ExecuteIfBound(false, TEXT("Input text is empty !"), -1, -1, -1);
 		return;
 	}
 
-	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, Input, MaxTokens]()
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!IsValid(World))
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("World is not valid !"), -1, -1, -1);
+		return;
+	}
+	
+	const FDateTime Counter_Start = FDateTime::Now();
+	this->Delegate_Counter = FTimerDelegate::CreateLambda([DelegateCounter, Counter_Start]()
+	{
+		const FTimespan Duration = FDateTime::Now() - Counter_Start;
+		DelegateCounter.ExecuteIfBound(FMath::TruncToInt32(Duration.GetTotalSeconds()));
+	});
+
+	World->GetTimerManager().SetTimer(this->Handle_Counter, this->Delegate_Counter, 1.0f, true);
+	
+	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, Input, MaxTokens, World]()
 		{
-			const std::string inputStr = TCHAR_TO_UTF8(*Input);
-			const std::chrono::steady_clock::time_point Start_Time = std::chrono::high_resolution_clock::now();
+			const std::chrono::high_resolution_clock::time_point Start_Time = std::chrono::high_resolution_clock::now();
+			const std::string PromptStr = TCHAR_TO_UTF8(*Input);
 
 			this->Cactus_Context->generated_text.clear();
-			this->Cactus_Context->params.prompt = inputStr;
+			this->Cactus_Context->params.prompt = PromptStr;
 			this->Cactus_Context->params.n_predict = MaxTokens;
 
 			if (!this->Cactus_Context->initSampling())
 			{
 				AsyncTask(ENamedThreads::GameThread, [DelegateCactus]()
 					{
-						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to initialize sampling parameters."));
+						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to initialize sampling parameters !"), -1, -1, -1);
 					}
 				);
 
@@ -149,19 +165,98 @@ void UCactusSubsystem::GenerateText(FDelegateCactus DelegateCactus, FString Inpu
 				NumTokens++;
 			}
 
-			const std::chrono::steady_clock::time_point End_Time = std::chrono::high_resolution_clock::now();
-			
 			this->Cactus_Context->endCompletion();
+			
+			const FString Result = UTF8_TO_TCHAR(this->Cactus_Context->generated_text.c_str());
+			
+			// Time to first token
+			const std::chrono::milliseconds TTFT = First_Token ? std::chrono::milliseconds(0) : std::chrono::duration_cast<std::chrono::milliseconds>(First_Token_Time - Start_Time);
+			const std::chrono::milliseconds Total_Time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - Start_Time);
+			
+			const double TT_Seconds = std::chrono::duration_cast<std::chrono::duration<double>>(Total_Time).count();
+			const double TTFT_Seconds = std::chrono::duration_cast<std::chrono::duration<double>>(TTFT).count();
 
-			const std::chrono::milliseconds Total_Time = std::chrono::duration_cast<std::chrono::milliseconds>(End_Time - Start_Time);
-			const std::chrono::milliseconds Time_To_First_Token = First_Token ? std::chrono::milliseconds(0) : std::chrono::duration_cast<std::chrono::milliseconds>(First_Token_Time - Start_Time);
-			const FString Result = FString(UTF8_TO_TCHAR(this->Cactus_Context->generated_text.c_str()));
-
-			AsyncTask(ENamedThreads::GameThread, [DelegateCactus, Result]()
-				{
-					DelegateCactus.ExecuteIfBound(true, Result);
+			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, Result, TT_Seconds, TTFT_Seconds, NumTokens, World]()
+				{				
+					World->GetTimerManager().ClearTimer(this->Handle_Counter);
+					DelegateCactus.ExecuteIfBound(true, Result, TT_Seconds, TTFT_Seconds, NumTokens);
 				}
 			);
+		}
+	);
+}
+
+void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens)
+{
+	if (!Cactus_Context.IsValid())
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("Cactus Context is not valid !"), -1, -1, -1);
+		return;
+	}
+
+	if (Input.IsEmpty())
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("Input text is empty !"), -1, -1, -1);
+		return;
+	}
+
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!IsValid(World))
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("World is not valid !"), -1, -1, -1);
+		return;
+	}
+
+	const FDateTime Counter_Start = FDateTime::Now();
+
+	this->Delegate_Counter = FTimerDelegate::CreateLambda([DelegateCounter, Counter_Start]()
+	{
+		const FTimespan Duration = FDateTime::Now() - Counter_Start;
+		DelegateCounter.ExecuteIfBound(FMath::TruncToInt32(Duration.GetTotalSeconds()));
+	});
+
+	World->GetTimerManager().SetTimer(this->Handle_Counter, this->Delegate_Counter, 1.0f, true);
+
+	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, Input, MaxTokens]()
+		{
+			FJsonObjectWrapper JSON_Message;
+			JSON_Message.JsonObject->SetStringField("role", "user");
+			JSON_Message.JsonObject->SetStringField("content", Input);
+
+			FString JSON_String;
+			JSON_Message.JsonObjectToString(JSON_String);
+			const std::string RawString = TCHAR_TO_UTF8(*JSON_String);
+
+			std::string Prompt;
+
+			if (this->Cactus_Context->embd.empty()) 
+			{
+				Prompt = this->Cactus_Context->getFormattedChat(RawString, "");
+			}
+
+			else 
+			{
+				std::string user_part = this->Cactus_Context->getFormattedChat(RawString, "");
+				size_t assistant_start = user_part.find("<|im_start|>assistant");
+				
+				if (assistant_start != std::string::npos)
+				{
+					Prompt = user_part.substr(0, assistant_start) + "<|im_start|>assistant\n";
+				}
+
+				else 
+				{
+					Prompt = user_part;
+				}
+			}
+
+			this->Cactus_Context->generated_text.clear();
+			this->Cactus_Context->params.prompt = Prompt;
+			this->Cactus_Context->params.n_predict = MaxTokens;
+
+			this->Cactus_Context->beginCompletion();
+			this->Cactus_Context->loadPrompt();
 		}
 	);
 }

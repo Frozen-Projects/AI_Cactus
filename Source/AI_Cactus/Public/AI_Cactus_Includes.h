@@ -1,5 +1,10 @@
 #pragma once
 
+#include "Kismet/GameplayStatics.h"
+
+#include "JsonObjectWrapper.h"
+#include "JsonUtilities.h"
+
 THIRD_PARTY_INCLUDES_START
 #include <vector>
 #include <string>

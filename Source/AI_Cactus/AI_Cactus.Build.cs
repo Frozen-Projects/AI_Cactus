@@ -37,7 +37,6 @@ public class AI_Cactus : ModuleRules
 				"Core",
                 "OpenSSL",
                 "libcurl"
-				// ... add other public dependencies that you statically link with here ...
 			}
 			);
 				
@@ -48,14 +47,9 @@ public class AI_Cactus : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				// ... add private dependencies that you statically link with here ...	
-			}
-			);
-			
-		DynamicallyLoadedModuleNames.AddRange(
-			new string[]
-			{
-				// ... add any modules that your module loads dynamically here ...
+                "Json",
+                "JsonUtilities",
+                "JsonBlueprintUtilities",
 			}
 			);
 	}
