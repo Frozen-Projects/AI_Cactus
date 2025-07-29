@@ -149,7 +149,7 @@ void UCactusSubsystem::GenerateText(FDelegateCactus DelegateCactus, FDelegateCou
 
 			while (this->Cactus_Context->has_next_token && !this->Cactus_Context->is_interrupted)
 			{
-				cactus::completion_token_output Token_Output = this->Cactus_Context->doCompletion();
+				const cactus::completion_token_output Token_Output = this->Cactus_Context->doCompletion();
 				
 				if (Token_Output.tok == -1)
 				{
@@ -186,7 +186,7 @@ void UCactusSubsystem::GenerateText(FDelegateCactus DelegateCactus, FDelegateCou
 	);
 }
 
-void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens)
+void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens, const FString& Assistant_Marker)
 {
 	if (!Cactus_Context.IsValid())
 	{
@@ -218,7 +218,7 @@ void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegate
 
 	World->GetTimerManager().SetTimer(this->Handle_Counter, this->Delegate_Counter, 1.0f, true);
 
-	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, Input, MaxTokens]()
+	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, Input, MaxTokens, Assistant_Marker, World]()
 		{
 			FJsonObjectWrapper JSON_Message;
 			JSON_Message.JsonObject->SetStringField("role", "user");
@@ -228,6 +228,9 @@ void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegate
 			JSON_Message.JsonObjectToString(JSON_String);
 			const std::string RawString = TCHAR_TO_UTF8(*JSON_String);
 
+			UE_LOG(LogTemp, Log, TEXT("Conversation JSON String: %s\n"), *JSON_String);
+			
+			/*
 			std::string Prompt;
 
 			if (this->Cactus_Context->embd.empty()) 
@@ -237,12 +240,12 @@ void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegate
 
 			else 
 			{
-				std::string user_part = this->Cactus_Context->getFormattedChat(RawString, "");
-				size_t assistant_start = user_part.find("<|im_start|>assistant");
+				const std::string user_part = this->Cactus_Context->getFormattedChat(RawString, "");
+				const size_t assistant_start = user_part.find(TCHAR_TO_UTF8(*Assistant_Marker));
 				
 				if (assistant_start != std::string::npos)
 				{
-					Prompt = user_part.substr(0, assistant_start) + "<|im_start|>assistant\n";
+					Prompt = user_part.substr(0, assistant_start) + TCHAR_TO_UTF8(*Assistant_Marker) + "\n";
 				}
 
 				else 
@@ -257,6 +260,60 @@ void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegate
 
 			this->Cactus_Context->beginCompletion();
 			this->Cactus_Context->loadPrompt();
+
+			const std::chrono::steady_clock::time_point Start_Time = std::chrono::high_resolution_clock::now();
+			bool First_Token = true;
+			std::chrono::high_resolution_clock::time_point First_Token_Time;
+			int NumTokens = 0;
+
+			while (this->Cactus_Context->has_next_token && !this->Cactus_Context->is_interrupted)
+			{
+				const cactus::completion_token_output Token_Output = this->Cactus_Context->doCompletion();
+				
+				if (Token_Output.tok == -1)
+				{
+					break;
+				}
+
+				if (First_Token)
+				{
+					First_Token_Time = std::chrono::high_resolution_clock::now();
+					First_Token = false;
+				}
+				
+				NumTokens++;
+			}
+
+			this->Cactus_Context->endCompletion();
+
+			const FString Result = UTF8_TO_TCHAR(this->Cactus_Context->generated_text.c_str());
+
+			const std::chrono::milliseconds Total_Time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - Start_Time);
+			const std::chrono::milliseconds TTFT = First_Token ? std::chrono::milliseconds(0) : std::chrono::duration_cast<std::chrono::milliseconds>(First_Token_Time - Start_Time);
+
+			const double TT_Seconds = std::chrono::duration_cast<std::chrono::duration<double>>(Total_Time).count();
+			const double TTFT_Seconds = std::chrono::duration_cast<std::chrono::duration<double>>(TTFT).count();
+
+			if (NumTokens > 0 && Total_Time.count() > 0)
+			{
+				float tokens_per_second = (float)NumTokens * 1000.0f / Total_Time.count();
+				//std::cout << ", Speed: " << std::fixed << std::setprecision(1) << tokens_per_second << " tok/s";
+			}
+
+			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, Result, TT_Seconds, TTFT_Seconds, NumTokens, World]()
+				{
+					World->GetTimerManager().ClearTimer(this->Handle_Counter);
+					DelegateCactus.ExecuteIfBound(true, Result, TT_Seconds, TTFT_Seconds, NumTokens);
+				}
+			);
+			*/
+
+			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, JSON_String, World]()
+				{
+					World->GetTimerManager().ClearTimer(this->Handle_Counter);
+					DelegateCactus.ExecuteIfBound(true, JSON_String, -1, -1, 0);
+				}
+			);
 		}
 	);
 }

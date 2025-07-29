@@ -49,6 +49,6 @@ public:
 	virtual void GenerateText(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens = 100);
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual void RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens = 250);
+	virtual void RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens = 250, const FString& Assistant_Marker = "<|im_start|>assistant");
 
 };
