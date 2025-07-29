@@ -220,17 +220,20 @@ void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegate
 
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, Input, MaxTokens, Assistant_Marker, World]()
 		{
-			FJsonObjectWrapper JSON_Message;
-			JSON_Message.JsonObject->SetStringField("role", "user");
-			JSON_Message.JsonObject->SetStringField("content", Input);
-
-			FString JSON_String;
-			JSON_Message.JsonObjectToString(JSON_String);
-			const std::string RawString = TCHAR_TO_UTF8(*JSON_String);
-
-			UE_LOG(LogTemp, Log, TEXT("Conversation JSON String: %s\n"), *JSON_String);
+			TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+			JsonObject->SetStringField("role", "user");
+			JsonObject->SetStringField("content", Input);
 			
-			/*
+			TArray<TSharedPtr<FJsonValue>> JsonArray;
+			JsonArray.Add(MakeShared<FJsonValueObject>(JsonObject));
+
+			FString OutputString;
+			TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
+			FJsonSerializer::Serialize(JsonArray, Writer);
+			UE_LOG(LogTemp, Log, TEXT("Conversation JSON String:\n%s"), *OutputString);
+			
+			const std::string RawString = TCHAR_TO_UTF8(*OutputString);
+
 			std::string Prompt;
 
 			if (this->Cactus_Context->embd.empty()) 
@@ -257,6 +260,17 @@ void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegate
 			this->Cactus_Context->generated_text.clear();
 			this->Cactus_Context->params.prompt = Prompt;
 			this->Cactus_Context->params.n_predict = MaxTokens;
+
+			if (!this->Cactus_Context->initSampling())
+			{
+				AsyncTask(ENamedThreads::GameThread, [DelegateCactus]()
+					{
+						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to initialize sampling parameters !"), -1, -1, -1);
+					}
+				);
+
+				return;
+			}
 
 			this->Cactus_Context->beginCompletion();
 			this->Cactus_Context->loadPrompt();
@@ -294,26 +308,21 @@ void UCactusSubsystem::RunConversation(FDelegateCactus DelegateCactus, FDelegate
 			const double TT_Seconds = std::chrono::duration_cast<std::chrono::duration<double>>(Total_Time).count();
 			const double TTFT_Seconds = std::chrono::duration_cast<std::chrono::duration<double>>(TTFT).count();
 
-			if (NumTokens > 0 && Total_Time.count() > 0)
-			{
-				float tokens_per_second = (float)NumTokens * 1000.0f / Total_Time.count();
-				//std::cout << ", Speed: " << std::fixed << std::setprecision(1) << tokens_per_second << " tok/s";
-			}
-
 			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, Result, TT_Seconds, TTFT_Seconds, NumTokens, World]()
 				{
 					World->GetTimerManager().ClearTimer(this->Handle_Counter);
 					DelegateCactus.ExecuteIfBound(true, Result, TT_Seconds, TTFT_Seconds, NumTokens);
 				}
 			);
-			*/
 
-			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, JSON_String, World]()
+			/*
+			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World, OutputString]()
 				{
 					World->GetTimerManager().ClearTimer(this->Handle_Counter);
-					DelegateCactus.ExecuteIfBound(true, JSON_String, -1, -1, 0);
+					DelegateCactus.ExecuteIfBound(true, OutputString, -1, -1, -1);
 				}
 			);
+			*/
 		}
 	);
 }

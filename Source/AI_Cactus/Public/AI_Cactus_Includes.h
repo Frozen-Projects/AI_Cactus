@@ -4,6 +4,8 @@
 
 #include "JsonObjectWrapper.h"
 #include "JsonUtilities.h"
+#include "Serialization/JsonWriter.h"
+#include "Serialization/JsonSerializer.h"
 
 THIRD_PARTY_INCLUDES_START
 #include <vector>
