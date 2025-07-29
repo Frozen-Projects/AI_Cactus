@@ -8,3 +8,7 @@ It uses actor classes. So, you can have multiple conversation for each instance 
 ## ROADMAP
 - Import and export system : It will allow us persistent conversation between level loads and after restarting project.
 - Multimodal, VLM, TTS features.
+- It currently works on Windows. I haven't tested it for packaging.
+
+## CAUTION
+- I don't have Apple and Linux devices. So, I can't offer support for other than Windows and Android.
