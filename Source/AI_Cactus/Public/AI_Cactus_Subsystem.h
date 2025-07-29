@@ -18,7 +18,7 @@ UDELEGATE(BlueprintAuthorityOnly)
 DECLARE_DYNAMIC_DELEGATE_OneParam(FDelegateCounter, int32, Out_Counter);
 
 UCLASS()
-class AI_CACTUS_API UCactusSubsystem : public UGameInstanceSubsystem
+class AI_CACTUS_API ACactusManager : public AActor
 {
 	GENERATED_BODY()
 	
@@ -31,10 +31,21 @@ private:
 	FTimerHandle Handle_Counter;
 	FTimerDelegate Delegate_Counter;
 
+protected:
+
+	// Called when the game starts or when spawned.
+	virtual void BeginPlay() override;
+
+	// Called when the game starts or when destroyed.
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 public:
 
-	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-	virtual void Deinitialize() override;
+	// Sets default values for this actor's properties.
+	ACactusManager();
+
+	// Called every frame.
+	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
 	virtual bool Init_Cactus(int32 NumberThreads = 4, const FString& AntiPrompt = "<|im_end|>");
@@ -51,4 +62,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
 	virtual void RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens = 250, const FString& Assistant_Marker = "<|im_start|>assistant");
 
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual bool ClearConversation();
+
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual bool ExportConversation(const FString& FilePath) const;
+
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual bool ImportConversation(const FString& FilePath, const FString& Assistant_Marker = "<|im_start|>assistant") const;
 };
