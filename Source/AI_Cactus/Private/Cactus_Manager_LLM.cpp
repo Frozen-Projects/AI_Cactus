@@ -1,38 +1,38 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "AI_Cactus_Manager.h"
+#include "Cactus_Manager_LLM.h"
 
 // Sets default values.
-ACactusManager::ACactusManager()
+ACactus_Manager_LLM::ACactus_Manager_LLM()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 }
 
 // Called when the game starts or when spawned.
-void ACactusManager::BeginPlay()
+void ACactus_Manager_LLM::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
 // Called when the game starts or when destroyed.
-void ACactusManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void ACactus_Manager_LLM::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (Cactus_Context.IsValid())
+	if (this->Cactus_Context.IsValid())
 	{
-		Cactus_Context.Reset();
+		this->Cactus_Context.Reset();
 	}
 
 	Super::EndPlay(EndPlayReason);
 }
 
 // Called every frame.
-void ACactusManager::Tick(float DeltaTime)
+void ACactus_Manager_LLM::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }
 
-bool ACactusManager::Init_Cactus(int32 NumberThreads, const FString& AntiPrompt)
+bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPrompt)
 {
 	if (Cactus_Context.IsValid())
 	{
@@ -94,7 +94,7 @@ bool ACactusManager::Init_Cactus(int32 NumberThreads, const FString& AntiPrompt)
 	}
 }
 
-bool ACactusManager::SetModelPath(const FString& Path)
+bool ACactus_Manager_LLM::SetModelPath(const FString& Path)
 {
 	if (Path.IsEmpty())
 	{
@@ -108,12 +108,12 @@ bool ACactusManager::SetModelPath(const FString& Path)
 	return true;
 }
 
-FString ACactusManager::GetModelPath() const
+FString ACactus_Manager_LLM::GetModelPath() const
 {
 	return this->Model_Path;
 }
 
-void ACactusManager::GenerateText(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens)
+void ACactus_Manager_LLM::GenerateText(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens)
 {
 	if (!Cactus_Context.IsValid())
 	{
@@ -210,7 +210,7 @@ void ACactusManager::GenerateText(FDelegateCactus DelegateCactus, FDelegateCactu
 	);
 }
 
-void ACactusManager::RunConversation(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens, const FString& Assistant_Marker)
+void ACactus_Manager_LLM::RunConversation(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens, const FString& Assistant_Marker)
 {
 	if (!Cactus_Context.IsValid())
 	{
@@ -348,7 +348,7 @@ void ACactusManager::RunConversation(FDelegateCactus DelegateCactus, FDelegateCa
 	);
 }
 
-bool ACactusManager::ClearConversation()
+bool ACactus_Manager_LLM::ClearConversation()
 {
 	if (!this->Cactus_Context.IsValid())
 	{
@@ -361,7 +361,7 @@ bool ACactusManager::ClearConversation()
 	return true;
 }
 
-void ACactusManager::ExportConversation(FDelegateCactusSave DelegateSave, const FString& SavePath)
+void ACactus_Manager_LLM::ExportConversation(FDelegateCactusSave DelegateSave, const FString& SavePath)
 {
 	if (!this->Cactus_Context.IsValid())
 	{
@@ -426,7 +426,7 @@ void ACactusManager::ExportConversation(FDelegateCactusSave DelegateSave, const 
 	);
 }
 
-void ACactusManager::ImportConversation(FDelegateCactusSave DelegateLoad, const FString& FilePath, const FString& Assistant_Marker)
+void ACactus_Manager_LLM::ImportConversation(FDelegateCactusSave DelegateLoad, const FString& FilePath, const FString& Assistant_Marker)
 {
 	if (!this->Cactus_Context.IsValid())
 	{

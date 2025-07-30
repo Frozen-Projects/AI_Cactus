@@ -5,35 +5,14 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 
-#include "AI_Cactus_Includes.h"
+#include "Cactus_Includes.h"
 
-#include "AI_Cactus_Manager.generated.h"
+#include "Cactus_Manager_LLM.generated.h"
 
 using namespace cactus;
 
-UDELEGATE(BlueprintAuthorityOnly)
-DECLARE_DYNAMIC_DELEGATE_FiveParams(FDelegateCactus, bool, bIsSuccessfull, FString, Out_Result, double, Out_TT, double, Out_TTF, int32, Out_Tokens);
-
-UDELEGATE(BlueprintAuthorityOnly)
-DECLARE_DYNAMIC_DELEGATE_OneParam(FDelegateCactusCounter, int32, Out_Counter);
-
-UDELEGATE(BlueprintAuthorityOnly)
-DECLARE_DYNAMIC_DELEGATE_OneParam(FDelegateCactusSave, bool, bIsSuccessfull);
-
 UCLASS()
-class AI_CACTUS_API UCactusConversationSave : public USaveGame
-{
-	GENERATED_BODY()
-
-public:
-
-	UPROPERTY(BlueprintReadOnly)
-	TArray<int32> EmbdTokens;
-
-};
-
-UCLASS()
-class AI_CACTUS_API ACactusManager : public AActor
+class AI_CACTUS_API ACactus_Manager_LLM : public AActor
 {
 	GENERATED_BODY()
 	
@@ -57,7 +36,7 @@ protected:
 public:
 
 	// Sets default values for this actor's properties.
-	ACactusManager();
+	ACactus_Manager_LLM();
 
 	// Called every frame.
 	virtual void Tick(float DeltaTime) override;

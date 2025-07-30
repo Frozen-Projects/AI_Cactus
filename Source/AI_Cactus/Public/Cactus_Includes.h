@@ -12,6 +12,8 @@
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
+#include "Cactus_Tools.h"
+
 THIRD_PARTY_INCLUDES_START
 #include <vector>
 #include <string>
