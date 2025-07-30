@@ -7,7 +7,7 @@
 
 #include "AI_Cactus_Includes.h"
 
-#include "AI_Cactus_Subsystem.generated.h"
+#include "AI_Cactus_Manager.generated.h"
 
 using namespace cactus;
 
@@ -15,7 +15,22 @@ UDELEGATE(BlueprintAuthorityOnly)
 DECLARE_DYNAMIC_DELEGATE_FiveParams(FDelegateCactus, bool, bIsSuccessfull, FString, Out_Result, double, Out_TT, double, Out_TTF, int32, Out_Tokens);
 
 UDELEGATE(BlueprintAuthorityOnly)
-DECLARE_DYNAMIC_DELEGATE_OneParam(FDelegateCounter, int32, Out_Counter);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FDelegateCactusCounter, int32, Out_Counter);
+
+UDELEGATE(BlueprintAuthorityOnly)
+DECLARE_DYNAMIC_DELEGATE_OneParam(FDelegateCactusSave, bool, bIsSuccessfull);
+
+UCLASS()
+class AI_CACTUS_API UCactusConversationSave : public USaveGame
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<int32> EmbdTokens;
+
+};
 
 UCLASS()
 class AI_CACTUS_API ACactusManager : public AActor
@@ -57,17 +72,17 @@ public:
 	virtual FString GetModelPath() const;
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual void GenerateText(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens = 100);
+	virtual void GenerateText(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens = 100);
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual void RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens = 250, const FString& Assistant_Marker = "<|im_start|>assistant");
+	virtual void RunConversation(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens = 250, const FString& Assistant_Marker = "<|im_start|>assistant");
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
 	virtual bool ClearConversation();
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual bool ExportConversation(const FString& FilePath) const;
+	virtual void ExportConversation(FDelegateCactusSave DelegateSave, const FString& SavePath);
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual bool ImportConversation(const FString& FilePath, const FString& Assistant_Marker = "<|im_start|>assistant") const;
+	virtual void ImportConversation(FDelegateCactusSave DelegateLoad, const FString& FilePath, const FString& Assistant_Marker = "<|im_start|>assistant");
 };

@@ -1,6 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "AI_Cactus_Subsystem.h"
+#include "AI_Cactus_Manager.h"
 
 // Sets default values.
 ACactusManager::ACactusManager()
@@ -36,19 +36,25 @@ bool ACactusManager::Init_Cactus(int32 NumberThreads, const FString& AntiPrompt)
 {
 	if (Cactus_Context.IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Cactus Context is already initialized."));
+		UE_LOG(LogTemp, Warning, TEXT("Cactus Context is already initialized !"));
+		return false;
+	}
+
+	if (AntiPrompt.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AntiPrompt is empty !"));
 		return false;
 	}
 
 	if (NumberThreads < 1)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Number of threads must be at least 1."));
+		UE_LOG(LogTemp, Warning, TEXT("Number of threads must be at least 1 !"));
 		return false;
 	}
 
 	if (this->Model_Path.IsEmpty())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Model path is not set."));
+		UE_LOG(LogTemp, Warning, TEXT("Model path is not set !"));
 		return false;
 	}
 
@@ -95,7 +101,10 @@ bool ACactusManager::SetModelPath(const FString& Path)
 		return false;
 	}
 
-	this->Model_Path = Path;
+	FString TempPath = Path;
+	FPaths::MakePlatformFilename(TempPath);
+
+	this->Model_Path = TempPath;
 	return true;
 }
 
@@ -104,7 +113,7 @@ FString ACactusManager::GetModelPath() const
 	return this->Model_Path;
 }
 
-void ACactusManager::GenerateText(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens)
+void ACactusManager::GenerateText(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens)
 {
 	if (!Cactus_Context.IsValid())
 	{
@@ -201,7 +210,7 @@ void ACactusManager::GenerateText(FDelegateCactus DelegateCactus, FDelegateCount
 	);
 }
 
-void ACactusManager::RunConversation(FDelegateCactus DelegateCactus, FDelegateCounter DelegateCounter, FString Input, int32 MaxTokens, const FString& Assistant_Marker)
+void ACactusManager::RunConversation(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens, const FString& Assistant_Marker)
 {
 	if (!Cactus_Context.IsValid())
 	{
@@ -212,6 +221,12 @@ void ACactusManager::RunConversation(FDelegateCactus DelegateCactus, FDelegateCo
 	if (Input.IsEmpty())
 	{
 		DelegateCactus.ExecuteIfBound(false, TEXT("Input text is empty !"), -1, -1, -1);
+		return;
+	}
+
+	if (Assistant_Marker.IsEmpty())
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("Assistant_Marker is empty !"), -1, -1, -1);
 		return;
 	}
 
@@ -346,22 +361,130 @@ bool ACactusManager::ClearConversation()
 	return true;
 }
 
-bool ACactusManager::ExportConversation(const FString& FilePath) const
+void ACactusManager::ExportConversation(FDelegateCactusSave DelegateSave, const FString& SavePath)
 {
 	if (!this->Cactus_Context.IsValid())
 	{
-		return false;
+		DelegateSave.ExecuteIfBound(false);
+		return;
 	}
 
-	if (FilePath.IsEmpty())
+	if (SavePath.IsEmpty() || !FPaths::DirectoryExists(FPaths::GetPath(SavePath)))
 	{
-		return false;
+		DelegateSave.ExecuteIfBound(false);
+		return;
 	}
 
-	return false;
+	const size_t TokenSize = this->Cactus_Context->embd.size();
+
+	if (TokenSize <= 0)
+	{
+		DelegateSave.ExecuteIfBound(false);
+		return;
+	}
+
+	UCactusConversationSave* SaveObject = Cast<UCactusConversationSave>(UGameplayStatics::CreateSaveGameObject(UCactusConversationSave::StaticClass()));
+	
+	if (!IsValid(SaveObject))
+	{
+		DelegateSave.ExecuteIfBound(false);
+		return;
+	}
+
+	SaveObject->EmbdTokens.SetNumUninitialized(TokenSize);
+	FMemory::Memcpy(SaveObject->EmbdTokens.GetData(), Cactus_Context->embd.data(), TokenSize * sizeof(int32));
+
+	AsyncTask(ENamedThreads::AnyNormalThreadNormalTask, [DelegateSave, SaveObject, SavePath]()
+		{
+			TArray<uint8> SaveData;
+			FMemoryWriter MemoryWriter(SaveData, true);
+			FObjectAndNameAsStringProxyArchive Archive(MemoryWriter, false);
+			SaveObject->Serialize(Archive);
+
+			if (FFileHelper::SaveArrayToFile(SaveData, *SavePath))
+			{
+				AsyncTask(ENamedThreads::GameThread, [DelegateSave]()
+					{
+						DelegateSave.ExecuteIfBound(true);
+					}
+				);
+
+				return;
+			}
+
+			else
+			{
+				AsyncTask(ENamedThreads::GameThread, [DelegateSave]()
+					{
+						DelegateSave.ExecuteIfBound(false);
+					}
+				);
+
+				return;
+			}
+		}
+	);
 }
 
-bool ACactusManager::ImportConversation(const FString& FilePath, const FString& Assistant_Marker) const
+void ACactusManager::ImportConversation(FDelegateCactusSave DelegateLoad, const FString& FilePath, const FString& Assistant_Marker)
 {
-	return false;
+	if (!this->Cactus_Context.IsValid())
+	{
+		DelegateLoad.ExecuteIfBound(false);
+		return;
+	}
+
+	FString TempPath = FilePath;
+	FPaths::NormalizeFilename(TempPath);
+
+	if (TempPath.IsEmpty() || !FPaths::FileExists(TempPath))
+	{
+		DelegateLoad.ExecuteIfBound(false);
+		return;
+	}
+
+	if (Assistant_Marker.IsEmpty())
+	{
+		DelegateLoad.ExecuteIfBound(false);
+		return;
+	}
+
+	TSubclassOf<UCactusConversationSave> SaveGameClass = UCactusConversationSave::StaticClass();
+	UCactusConversationSave* LoadedGame = NewObject<UCactusConversationSave>(GetTransientPackage(), SaveGameClass);
+
+	if (!IsValid(LoadedGame))
+	{
+		DelegateLoad.ExecuteIfBound(false);
+		return;
+	}
+
+	AsyncTask(ENamedThreads::AnyNormalThreadNormalTask, [this, DelegateLoad, TempPath, LoadedGame]()
+		{
+			TArray<uint8> LoadData;
+			if (!FFileHelper::LoadFileToArray(LoadData, *TempPath))
+			{
+				AsyncTask(ENamedThreads::GameThread, [DelegateLoad]()
+					{
+						DelegateLoad.ExecuteIfBound(false);
+					}
+				);
+
+				return;
+			}
+
+			FMemoryReader MemoryReader(LoadData, true);
+			FObjectAndNameAsStringProxyArchive Archive(MemoryReader, true);
+			LoadedGame->Serialize(Archive);
+
+			const size_t TokenSize = LoadedGame->EmbdTokens.Num();
+			this->Cactus_Context->embd.resize(TokenSize);
+			FMemory::Memcpy(Cactus_Context->embd.data(), LoadedGame->EmbdTokens.GetData(), TokenSize * sizeof(int32));
+
+			AsyncTask(ENamedThreads::GameThread, [DelegateLoad]()
+				{
+					DelegateLoad.ExecuteIfBound(true);
+				}
+			);
+		}
+	);
 }
