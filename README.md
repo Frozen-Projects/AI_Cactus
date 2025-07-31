@@ -17,3 +17,8 @@ It uses actor classes. So, you can have multiple conversation for each instance 
 
 ## Caution
 - I don't have Apple and Linux devices. So, I can't offer support for other than Windows and Android.
+
+## Sample Models
+LLM Test : https://huggingface.co/QuantFactory/SmolLM-360M-Instruct-GGUF/resolve/main/SmolLM-360M-Instruct.Q6_K.gguf </br>
+VLM Model : https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf </br>
+VLM Proj : https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf </br>
