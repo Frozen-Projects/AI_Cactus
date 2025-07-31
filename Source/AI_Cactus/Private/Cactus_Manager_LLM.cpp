@@ -32,7 +32,7 @@ void ACactus_Manager_LLM::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPrompt)
+bool ACactus_Manager_LLM::Init_Cactus(FCactusModelParams_LLM LLM_Params)
 {
 	if (Cactus_Context.IsValid())
 	{
@@ -40,15 +40,15 @@ bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPr
 		return false;
 	}
 
-	if (AntiPrompt.IsEmpty())
+	if (LLM_Params.AntiPrompt.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AntiPrompt is empty !"));
 		return false;
 	}
 
-	if (NumberThreads < 1)
+	if (LLM_Params.bIsNumbersOkay())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Number of threads must be at least 1 !"));
+		UE_LOG(LogTemp, Warning, TEXT("Numeric values should bigger than 0 !"));
 		return false;
 	}
 
@@ -61,20 +61,20 @@ bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPr
 	try
 	{
 		this->Cactus_Params.model.path = TCHAR_TO_UTF8(*this->Path_Model);
-		this->Cactus_Params.n_ctx = 4096;
-		this->Cactus_Params.n_batch = 512;
-		this->Cactus_Params.n_gpu_layers = 99;
-		this->Cactus_Params.cpuparams.n_threads = NumberThreads;
+		this->Cactus_Params.n_ctx = LLM_Params.ContextSize;
+		this->Cactus_Params.n_batch = LLM_Params.BatchSize;
+		this->Cactus_Params.n_gpu_layers = LLM_Params.GPULayers;
+		this->Cactus_Params.cpuparams.n_threads = LLM_Params.CPUThreads;
 
-		this->Cactus_Params.n_cache_reuse = 256;
-		this->Cactus_Params.n_keep = 32;
+		this->Cactus_Params.n_cache_reuse = LLM_Params.CacheReuse;
+		this->Cactus_Params.n_keep = LLM_Params.KeepTokens;
 
-		this->Cactus_Params.sampling.temp = 0.7f;
-		this->Cactus_Params.sampling.top_k = 40;
-		this->Cactus_Params.sampling.top_p = 0.9f;
-		this->Cactus_Params.sampling.penalty_repeat = 1.1f;
+		this->Cactus_Params.sampling.temp = LLM_Params.Temperature;
+		this->Cactus_Params.sampling.top_k = LLM_Params.TopK;
+		this->Cactus_Params.sampling.top_p = LLM_Params.TopP;
+		this->Cactus_Params.sampling.penalty_repeat = LLM_Params.RepeatPenalty;
 
-		this->Cactus_Params.antiprompt.push_back(TCHAR_TO_UTF8(*AntiPrompt));
+		this->Cactus_Params.antiprompt.push_back(TCHAR_TO_UTF8(*LLM_Params.AntiPrompt));
 
 		this->Cactus_Context = MakeShared<cactus_context, ESPMode::ThreadSafe>();
 

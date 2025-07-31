@@ -46,7 +46,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual bool Init_Cactus(int32 NumberThreads = 4, const FString& AntiPrompt = "<|im_end|>");
+	virtual bool Init_Cactus(FCactusModelParams_VLM VLM_Params);
 
 	/*
 	* @param In_Path_MMProj: Only required if using a model that requires a MMProj file. Otherwise, don't change this parameter or it will return false.

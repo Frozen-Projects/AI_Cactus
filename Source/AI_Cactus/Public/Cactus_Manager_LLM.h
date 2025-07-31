@@ -42,7 +42,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual bool Init_Cactus(int32 NumberThreads = 4, const FString& AntiPrompt = "<|im_end|>");
+	virtual bool Init_Cactus(FCactusModelParams_LLM LLM_Params);
 	
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
 	virtual bool SetModelPath(const FString& In_Path);
