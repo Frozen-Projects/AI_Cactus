@@ -18,7 +18,7 @@ class AI_CACTUS_API ACactus_Manager_LLM : public AActor
 	
 private:
 
-	FString Model_Path;
+	FString Path_Model;
 	TSharedPtr<cactus_context, ESPMode::ThreadSafe> Cactus_Context;
 	common_params Cactus_Params;
 
@@ -45,9 +45,9 @@ public:
 	virtual bool Init_Cactus(int32 NumberThreads = 4, const FString& AntiPrompt = "<|im_end|>");
 	
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual bool SetModelPath(const FString& Path);
+	virtual bool SetModelPath(const FString& In_Path);
 
-	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	UFUNCTION(BlueprintPure, Category = "AI Cactus")
 	virtual FString GetModelPath() const;
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")

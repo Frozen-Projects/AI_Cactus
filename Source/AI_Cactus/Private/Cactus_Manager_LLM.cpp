@@ -52,7 +52,7 @@ bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPr
 		return false;
 	}
 
-	if (this->Model_Path.IsEmpty())
+	if (this->Path_Model.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Model path is not set !"));
 		return false;
@@ -60,7 +60,7 @@ bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPr
 
 	try
 	{
-		this->Cactus_Params.model.path = TCHAR_TO_UTF8(*this->Model_Path);
+		this->Cactus_Params.model.path = TCHAR_TO_UTF8(*this->Path_Model);
 		this->Cactus_Params.n_ctx = 4096;
 		this->Cactus_Params.n_batch = 512;
 		this->Cactus_Params.n_gpu_layers = 99;
@@ -80,7 +80,7 @@ bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPr
 
 		if (!this->Cactus_Context->loadModel(this->Cactus_Params))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Failed to load Cactus model from path: %s"), *this->Model_Path);
+			UE_LOG(LogTemp, Error, TEXT("Failed to load Cactus model from path: %s"), *this->Path_Model);
 			return false;
 		}
 
@@ -94,23 +94,23 @@ bool ACactus_Manager_LLM::Init_Cactus(int32 NumberThreads, const FString& AntiPr
 	}
 }
 
-bool ACactus_Manager_LLM::SetModelPath(const FString& Path)
+bool ACactus_Manager_LLM::SetModelPath(const FString& In_Path)
 {
-	if (Path.IsEmpty())
+	if (In_Path.IsEmpty())
 	{
 		return false;
 	}
 
-	FString TempPath = Path;
+	FString TempPath = In_Path;
 	FPaths::MakePlatformFilename(TempPath);
 
-	this->Model_Path = TempPath;
+	this->Path_Model = TempPath;
 	return true;
 }
 
 FString ACactus_Manager_LLM::GetModelPath() const
 {
-	return this->Model_Path;
+	return this->Path_Model;
 }
 
 void ACactus_Manager_LLM::GenerateText(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString Input, int32 MaxTokens)

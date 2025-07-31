@@ -18,7 +18,11 @@ class AI_CACTUS_API ACactus_Manager_VLM : public AActor
 	
 private:
 
-	FString Model_Path;
+	FString Path_Model;
+
+	// Path to the MMProj file, if applicable.
+	FString Path_MMProj;
+
 	TSharedPtr<cactus_context, ESPMode::ThreadSafe> Cactus_Context;
 	common_params Cactus_Params;
 
@@ -41,4 +45,18 @@ public:
 	// Called every frame.
 	virtual void Tick(float DeltaTime) override;
 
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual bool Init_Cactus(int32 NumberThreads = 4, const FString& AntiPrompt = "<|im_end|>");
+
+	/*
+	* @param In_Path_MMProj: Only required if using a model that requires a MMProj file. Otherwise, don't change this parameter or it will return false.
+	*/
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual bool SetModelPath(const FString& In_Path_Model, const FString& In_Path_MMProj = "MMPROJ_DISABLED");
+
+	UFUNCTION(BlueprintPure, Category = "AI Cactus")
+	virtual FString GetModelPath() const;
+
+	UFUNCTION(BlueprintPure, Category = "AI Cactus")
+	virtual FString GetMMProjPath() const;
 };
