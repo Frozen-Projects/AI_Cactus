@@ -40,8 +40,43 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 		return false;
 	}
 
+	if (VLM_Params.AntiPrompt.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AntiPrompt is empty !"));
+		return false;
+	}
+
+	if (VLM_Params.bIsNumbersOkay())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Numeric values should bigger than 0 !"));
+		return false;
+	}
+
+	if (this->Path_Model.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Model path is not set !"));
+		return false;
+	}
+
 	try
 	{
+		this->Cactus_Params.model.path = TCHAR_TO_UTF8(*this->Path_Model);
+		this->Cactus_Params.n_ctx = VLM_Params.ContextSize;
+		this->Cactus_Params.n_batch = VLM_Params.BatchSize;
+		this->Cactus_Params.n_gpu_layers = VLM_Params.GPULayers;
+		this->Cactus_Params.cpuparams.n_threads = VLM_Params.CPUThreads;
+
+		if (!this->Cactus_Context->loadModel(this->Cactus_Params))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to load Cactus model from path: %s"), *this->Path_Model);
+			return false;
+		}
+
+		if (!this->Path_MMProj.IsEmpty() && this->Path_MMProj != "MMPROJ_DISABLED")
+		{
+			this->Cactus_Context->initMultimodal(TCHAR_TO_UTF8(*this->Path_MMProj), VLM_Params.bUseGPUForMMProj);
+		}
+
 		return true;
 	}
 
