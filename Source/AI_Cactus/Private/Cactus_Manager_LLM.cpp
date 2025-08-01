@@ -46,7 +46,7 @@ bool ACactus_Manager_LLM::Init_Cactus(FCactusModelParams_LLM LLM_Params)
 		return false;
 	}
 
-	if (LLM_Params.bIsNumbersOkay())
+	if (!LLM_Params.bIsNumbersOkay())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Numeric values should bigger than 0 !"));
 		return false;

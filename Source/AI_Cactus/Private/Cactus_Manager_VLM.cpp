@@ -40,13 +40,7 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 		return false;
 	}
 
-	if (VLM_Params.AntiPrompt.IsEmpty())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("AntiPrompt is empty !"));
-		return false;
-	}
-
-	if (VLM_Params.bIsNumbersOkay())
+	if (!VLM_Params.bIsNumbersOkay())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Numeric values should bigger than 0 !"));
 		return false;
