@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 
-#include "Cactus_Includes.h"
+#include "Cactus_Tools.h"
 
 #include "Cactus_Manager_VLM.generated.h"
 
@@ -59,4 +59,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "AI Cactus")
 	virtual FString GetMMProjPath() const;
+
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual void GenerateResponseToImage(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question);
+
 };

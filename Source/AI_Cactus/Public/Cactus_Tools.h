@@ -1,5 +1,5 @@
 #pragma once
-
+#include "Cactus_Includes.h"
 #include "Cactus_Tools.generated.h"
 
 UDELEGATE(BlueprintAuthorityOnly)
@@ -105,4 +105,11 @@ struct AI_CACTUS_API FCactusModelParams_VLM
     {
         return ContextSize > 0 && BatchSize > 0 && GPULayers > 0 && CPUThreads > 0 && MaxTokens > 0;
 	}
+};
+
+struct cactus_context_vlm : public cactus::cactus_context
+{
+    virtual std::vector<uint8_t> Convert_Array(TArray<uint8_t> ImageData);
+    virtual std::vector<uint8_t> BGRA_To_RGBA(const std::vector<uint8_t>& ImageData);
+    virtual bool Load_Image_Buffer(const std::vector<uint8_t>& Buffer, uint32_t Width, uint32_t Height, bool bUseAlpha, bool bIsBGRA);
 };

@@ -118,3 +118,58 @@ FString ACactus_Manager_VLM::GetMMProjPath() const
 {
 	return this->Path_MMProj;
 }
+
+void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question)
+{
+	if (!Cactus_Context.IsValid())
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("Cactus Context is not valid !"), -1, -1, -1);
+		return;
+	}
+
+	if (ImageData.IsEmpty())
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("Image data is empty !"), -1, -1, -1);
+		return;
+	}
+
+	if (ImageSize.X <= 0 || ImageSize.Y <= 0)
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("Image size shouldn't smaller 1 !"), -1, -1, -1);
+		return;
+	}
+
+	if (Question.IsEmpty())
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("Question text is empty !"), -1, -1, -1);
+		return;
+	}
+
+	UWorld* World = GEngine->GetCurrentPlayWorld();
+
+	if (!IsValid(World))
+	{
+		DelegateCactus.ExecuteIfBound(false, TEXT("World is not valid !"), -1, -1, -1);
+		return;
+	}
+
+	const FDateTime Counter_Start = FDateTime::Now();
+	this->Delegate_Counter = FTimerDelegate::CreateLambda([DelegateCounter, Counter_Start]()
+		{
+			const FTimespan Duration = FDateTime::Now() - Counter_Start;
+			DelegateCounter.ExecuteIfBound(FMath::TruncToInt32(Duration.GetTotalSeconds()));
+		});
+
+	World->GetTimerManager().SetTimer(this->Handle_Counter, this->Delegate_Counter, 1.0f, true);
+
+	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, ImageData, ImageSize, Question, World]()
+		{
+
+			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, DelegateCounter, World]()
+				{
+					World->GetTimerManager().ClearTimer(this->Handle_Counter);
+				}
+			);
+		}
+	);
+}
