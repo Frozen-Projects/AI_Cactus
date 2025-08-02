@@ -61,6 +61,6 @@ public:
 	virtual FString GetMMProjPath() const;
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual void GenerateResponseToImage(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question);
+	virtual void GenerateResponseToImage(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question, int32 MaxTokens = 50);
 
 };

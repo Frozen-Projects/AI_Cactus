@@ -95,16 +95,12 @@ struct AI_CACTUS_API FCactusModelParams_VLM
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cactus|VLM")
     bool bUseGPUForMMProj = true;  // Use GPU for mmproj acceleration
 
-    // ==== Token & Output Control ====
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cactus|VLM")
-    int32 MaxTokens = 50;   // Equivalent to params.n_predict for VLM responses
-
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI Cactus")
     FString AntiPrompt = "<|im_end|>";  // Equivalent to params.anti_prompt
 
     bool bIsNumbersOkay() const
     {
-        return ContextSize > 0 && BatchSize > 0 && GPULayers > 0 && CPUThreads > 0 && MaxTokens > 0;
+        return ContextSize > 0 && BatchSize > 0 && GPULayers > 0 && CPUThreads > 0;
 	}
 };
 

@@ -121,7 +121,7 @@ FString ACactus_Manager_VLM::GetMMProjPath() const
 	return this->Path_MMProj;
 }
 
-void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question)
+void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question, int32 MaxTokens)
 {
 	if (!Cactus_Context.IsValid())
 	{
@@ -164,12 +164,98 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 
 	World->GetTimerManager().SetTimer(this->Handle_Counter, this->Delegate_Counter, 1.0f, true);
 
-	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, ImageData, ImageSize, Question, World]()
+	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, ImageData, ImageSize, Question, MaxTokens, World]()
 		{
+			std::vector<uint8_t> BGRA_Buffer = this->Cactus_Context->Convert_Array(ImageData);
 
-			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, DelegateCounter, World]()
+			if (this->Cactus_Context->Load_Image_Buffer(BGRA_Buffer, static_cast<uint32_t>(ImageSize.X), static_cast<uint32_t>(ImageSize.Y), true))
+			{
+				AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World]()
+					{
+						World->GetTimerManager().ClearTimer(this->Handle_Counter);
+						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to load image buffer !"), -1, -1, -1);
+					}
+				);
+
+				return;
+			}
+
+			// Prepare prompt (VLM format with image + question)
+			std::string Messages = R"([{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ")"
+				+ std::string(TCHAR_TO_UTF8(*Question)) + R"("}]}])";
+
+			std::string FormattedPrompt;
+			
+			try
+			{
+				FormattedPrompt = this->Cactus_Context->getFormattedChat(Messages, "");
+			}
+
+			catch (const std::exception& Exception)
+			{
+				FormattedPrompt = TCHAR_TO_UTF8(*Question);
+				UE_LOG(LogTemp, Error, TEXT("Exception occurred while formatting chat: %s"), UTF8_TO_TCHAR(Exception.what()));
+			}
+
+			this->Cactus_Context->params.prompt = FormattedPrompt;
+			this->Cactus_Context->params.n_predict = MaxTokens;
+
+			// Init sampling
+			if (!this->Cactus_Context->initSampling())
+			{
+				AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World]()
+					{
+						World->GetTimerManager().ClearTimer(this->Handle_Counter);
+						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to initialize sampling!"), -1, -1, -1);
+					}
+				);
+
+				return;
+			}
+
+			// Rewind context for correct image+text generation
+			this->Cactus_Context->rewind();
+
+			// Start completion
+			this->Cactus_Context->generated_text.clear();
+			this->Cactus_Context->beginCompletion();
+			this->Cactus_Context->loadPrompt({}); // Empty media_paths since we loaded buffer directly
+
+			auto StartTime = std::chrono::high_resolution_clock::now();
+			bool FirstToken = true;
+			std::chrono::high_resolution_clock::time_point FirstTokenTime;
+			int NumTokens = 0;
+
+			while (this->Cactus_Context->has_next_token && !this->Cactus_Context->is_interrupted)
+			{
+				const cactus::completion_token_output Token_Output = this->Cactus_Context->doCompletion();
+				
+				if (Token_Output.tok == -1)
+				{
+					break;
+				}
+
+				if (FirstToken)
+				{
+					FirstTokenTime = std::chrono::high_resolution_clock::now();
+					FirstToken = false;
+				}
+
+				NumTokens++;
+			}
+
+			this->Cactus_Context->endCompletion();
+
+			auto TotalTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - StartTime);
+			auto TTFT = FirstToken ? std::chrono::milliseconds(0) : std::chrono::duration_cast<std::chrono::milliseconds>(FirstTokenTime - StartTime);
+
+			FString Result = UTF8_TO_TCHAR(this->Cactus_Context->generated_text.c_str());
+
+			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World, Result, TotalTime, TTFT, NumTokens]()
 				{
 					World->GetTimerManager().ClearTimer(this->Handle_Counter);
+					DelegateCactus.ExecuteIfBound(true, Result, TotalTime.count() / 1000.0, TTFT.count() / 1000.0, NumTokens);
+
 				}
 			);
 		}

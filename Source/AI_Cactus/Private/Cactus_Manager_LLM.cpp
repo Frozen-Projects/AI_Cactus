@@ -155,8 +155,9 @@ void ACactus_Manager_LLM::GenerateText(FDelegateCactus DelegateCactus, FDelegate
 
 			if (!this->Cactus_Context->initSampling())
 			{
-				AsyncTask(ENamedThreads::GameThread, [DelegateCactus]()
+				AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World]()
 					{
+						World->GetTimerManager().ClearTimer(this->Handle_Counter);
 						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to initialize sampling parameters !"), -1, -1, -1);
 					}
 				);

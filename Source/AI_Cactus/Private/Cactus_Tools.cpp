@@ -9,7 +9,7 @@ std::vector<uint8_t> cactus_context_vlm::Convert_Array(TArray<uint8_t> ImageData
 
 	const size_t NumBytes = ImageData.Num();
 	std::vector<uint8_t> TempBuffer;
-	TempBuffer.reserve(NumBytes);
+	TempBuffer.resize(NumBytes);
 	FMemory::Memcpy(TempBuffer.data(), ImageData.GetData(), NumBytes);
 
 	return TempBuffer;
@@ -25,13 +25,13 @@ std::vector<uint8_t> cactus_context_vlm::BGRA_To_RGB(const std::vector<uint8_t>&
 	const size_t NumBytes = ImageData.size();
 
 	std::vector<uint8_t> TempBuffer;
-	TempBuffer.reserve(NumBytes);
+	TempBuffer.resize(NumBytes);
 
-	for (size_t i = 0; i < NumBytes; i += 4)
+	for (size_t i = 0, j = 0; i < ImageData.size(); i += 4, j += 3)
 	{
-		TempBuffer.push_back(ImageData[i + 2]); // R
-		TempBuffer.push_back(ImageData[i + 1]); // G
-		TempBuffer.push_back(ImageData[i + 0]); // B
+		TempBuffer[j] = ImageData[i + 2];		// R
+		TempBuffer[j + 1] = ImageData[i + 1];	// G
+		TempBuffer[j + 2] = ImageData[i + 0];	// B
 	}
 
 	return TempBuffer;
