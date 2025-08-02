@@ -60,6 +60,8 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 		this->Cactus_Params.n_gpu_layers = VLM_Params.GPULayers;
 		this->Cactus_Params.cpuparams.n_threads = VLM_Params.CPUThreads;
 
+		this->Cactus_Context = MakeShared<cactus_context_vlm, ESPMode::ThreadSafe>();
+
 		if (!this->Cactus_Context->loadModel(this->Cactus_Params))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Failed to load Cactus model from path: %s"), *this->Path_Model);

@@ -23,7 +23,7 @@ private:
 	// Path to the MMProj file, if applicable.
 	FString Path_MMProj;
 
-	TSharedPtr<cactus_context, ESPMode::ThreadSafe> Cactus_Context;
+	TSharedPtr<cactus_context_vlm, ESPMode::ThreadSafe> Cactus_Context;
 	common_params Cactus_Params;
 
 	FTimerHandle Handle_Counter;

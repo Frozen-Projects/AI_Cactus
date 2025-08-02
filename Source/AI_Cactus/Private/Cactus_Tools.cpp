@@ -2,7 +2,7 @@
 
 std::vector<uint8_t> cactus_context_vlm::Convert_Array(TArray<uint8_t> ImageData)
 {
-	if (ImageData.Num() == 0)
+	if (ImageData.IsEmpty())
 	{
 		return std::vector<uint8_t>();
 	}
@@ -15,30 +15,29 @@ std::vector<uint8_t> cactus_context_vlm::Convert_Array(TArray<uint8_t> ImageData
 	return TempBuffer;
 }
 
-std::vector<uint8_t> cactus_context_vlm::BGRA_To_RGBA(const std::vector<uint8_t>& ImageData)
+std::vector<uint8_t> cactus_context_vlm::BGRA_To_RGB(const std::vector<uint8_t>& ImageData)
 {
+	if (ImageData.empty())
+	{
+		return std::vector<uint8_t>();
+	}
+
 	const size_t NumBytes = ImageData.size();
 
 	std::vector<uint8_t> TempBuffer;
 	TempBuffer.reserve(NumBytes);
 
-	for (int i = 0; i < NumBytes; i += 4)
+	for (size_t i = 0; i < NumBytes; i += 4)
 	{
-		uint8_t B = ImageData[i];
-		uint8_t G = ImageData[i + 1];
-		uint8_t R = ImageData[i + 2];
-		uint8_t A = ImageData[i + 3];
-
-		TempBuffer.push_back(R);
-		TempBuffer.push_back(G);
-		TempBuffer.push_back(B);
-		TempBuffer.push_back(A);
+		TempBuffer.push_back(ImageData[i + 2]); // R
+		TempBuffer.push_back(ImageData[i + 1]); // G
+		TempBuffer.push_back(ImageData[i + 0]); // B
 	}
 
 	return TempBuffer;
 }
 
-bool cactus_context_vlm::Load_Image_Buffer(const std::vector<uint8_t>& Buffer, uint32_t Width, uint32_t Height, bool bUseAlpha, bool bIsBGRA)
+bool cactus_context_vlm::Load_Image_Buffer(const std::vector<uint8_t>& Buffer, uint32_t Width, uint32_t Height, bool bIsDataBGRA)
 {
 	if (Buffer.size() == 0)
 	{
@@ -50,16 +49,16 @@ bool cactus_context_vlm::Load_Image_Buffer(const std::vector<uint8_t>& Buffer, u
 		return false;
 	}
 
-	if (Buffer.size() != Width * Height * (bUseAlpha ? 4 : 3))
+	if (Buffer.size() != Width * Height * 3)
 	{
 		return false;
 	}
 
 	std::vector<uint8_t> ProcessedBuffer;
 
-	if (bIsBGRA)
+	if (bIsDataBGRA)
 	{
-		ProcessedBuffer = BGRA_To_RGBA(Buffer);
+		ProcessedBuffer = BGRA_To_RGB(Buffer);
 
 		if (ProcessedBuffer.empty())
 		{
@@ -72,5 +71,26 @@ bool cactus_context_vlm::Load_Image_Buffer(const std::vector<uint8_t>& Buffer, u
 		ProcessedBuffer = Buffer;
 	}
 
-	return false;
+	mtmd_bitmap* Bitmap = mtmd_bitmap_init(Width, Height, reinterpret_cast<const unsigned char*>(ProcessedBuffer.data()));
+
+	if (!Bitmap)
+	{
+		return false;
+	}
+
+	std::vector<const mtmd_bitmap*> media_bitmaps = { Bitmap };
+
+	mtmd_input_chunks* chunks = mtmd_input_chunks_init();
+	
+	mtmd_input_text input_text;
+	memset(&input_text, 0, sizeof(mtmd_input_text));
+	input_text.text = params.prompt.c_str();
+	input_text.add_special = true;
+	input_text.parse_special = true;
+
+	const int Result = mtmd_tokenize(mtmd_wrapper->mtmd_ctx, chunks, &input_text, media_bitmaps.data(), media_bitmaps.size());
+
+	mtmd_bitmap_free(Bitmap);
+
+	return Result == 0;
 }
