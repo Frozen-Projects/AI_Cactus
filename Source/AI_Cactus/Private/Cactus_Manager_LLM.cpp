@@ -32,6 +32,23 @@ void ACactus_Manager_LLM::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+std::string ACactus_Manager_LLM::JsonMaker(const FString& Question) const
+{
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField("role", "user");
+	JsonObject->SetStringField("content", Question);
+
+	TArray<TSharedPtr<FJsonValue>> JsonArray;
+	JsonArray.Add(MakeShared<FJsonValueObject>(JsonObject));
+
+	FString OutputString;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
+	FJsonSerializer::Serialize(JsonArray, Writer);
+	UE_LOG(LogTemp, Log, TEXT("Conversation JSON String:\n%s"), *OutputString);
+
+	return TCHAR_TO_UTF8(*OutputString);
+}
+
 bool ACactus_Manager_LLM::Init_Cactus(FCactusModelParams_LLM LLM_Params)
 {
 	if (Cactus_Context.IsValid())
@@ -251,19 +268,7 @@ void ACactus_Manager_LLM::RunConversation(FDelegateCactus DelegateCactus, FDeleg
 
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, Input, MaxTokens, Assistant_Marker, World]()
 		{
-			TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
-			JsonObject->SetStringField("role", "user");
-			JsonObject->SetStringField("content", Input);
-			
-			TArray<TSharedPtr<FJsonValue>> JsonArray;
-			JsonArray.Add(MakeShared<FJsonValueObject>(JsonObject));
-
-			FString OutputString;
-			TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
-			FJsonSerializer::Serialize(JsonArray, Writer);
-			UE_LOG(LogTemp, Log, TEXT("Conversation JSON String:\n%s"), *OutputString);
-			
-			const std::string RawString = TCHAR_TO_UTF8(*OutputString);
+			const std::string RawString = this->JsonMaker(Input);
 
 			std::string Prompt;
 

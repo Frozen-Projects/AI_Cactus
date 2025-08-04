@@ -16,6 +16,8 @@ THIRD_PARTY_INCLUDES_START
 #include <vector>
 #include <string>
 #include <chrono>
+#include <stdexcept>
+#include <algorithm>
 
 #include "cactus.h"
 #include "tools/mtmd/mtmd.h"

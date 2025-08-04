@@ -32,6 +32,72 @@ void ACactus_Manager_VLM::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+std::string ACactus_Manager_VLM::JsonMaker(const FString& Question) const
+{
+	// --- Build "image" content ---
+	TSharedRef<FJsonObject> ImageObject = MakeShared<FJsonObject>();
+	ImageObject->Values.Empty(); // Ensure no extra hidden fields
+	ImageObject->SetStringField(TEXT("type"), TEXT("image"));
+
+	// --- Build "text" content ---
+	TSharedRef<FJsonObject> TextObject = MakeShared<FJsonObject>();
+	TextObject->Values.Empty(); // Ensure no extra hidden fields
+	TextObject->SetStringField(TEXT("type"), TEXT("text"));
+	TextObject->SetStringField(TEXT("text"), Question);
+
+	// --- Build "content" array ---
+	TArray<TSharedPtr<FJsonValue>> ContentArray;
+	ContentArray.Reserve(2);
+	ContentArray.Add(MakeShared<FJsonValueObject>(ImageObject));
+	ContentArray.Add(MakeShared<FJsonValueObject>(TextObject));
+
+	// --- Build "user" object ---
+	TSharedRef<FJsonObject> UserObject = MakeShared<FJsonObject>();
+	UserObject->Values.Empty(); // Ensure no extra hidden fields
+	UserObject->SetStringField(TEXT("role"), TEXT("user"));
+	UserObject->SetArrayField(TEXT("content"), ContentArray);
+
+	// --- Wrap in outer array ---
+	TArray<TSharedPtr<FJsonValue>> MessagesArray;
+	MessagesArray.Reserve(1);
+	MessagesArray.Add(MakeShared<FJsonValueObject>(UserObject));
+
+	// --- Serialize ---
+	FString OutputString;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
+	if (!FJsonSerializer::Serialize(MessagesArray, Writer))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to serialize JSON for Cactus."));
+		return "";
+	}
+
+	// --- Convert to std::string ---
+	std::string MessagesStd = TCHAR_TO_UTF8(*OutputString);
+
+	// --- Log for debugging ---
+	UE_LOG(LogTemp, Log, TEXT("Conversation JSON String:\n%s"), *OutputString);
+
+	/*
+	* Sample JSON Structure:
+	[
+		{
+			"role": "user",
+				"content" : [
+			{
+				"type": "image"
+			},
+				{
+					"type": "text",
+					"text" : "What do you see in this image ?"
+				}
+				]
+		}
+	]
+	*/
+
+	return MessagesStd;
+}
+
 bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 {
 	if (Cactus_Context.IsValid())
@@ -71,6 +137,7 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 		if (!this->Path_MMProj.IsEmpty() && this->Path_MMProj != "MMPROJ_DISABLED")
 		{
 			this->Cactus_Context->initMultimodal(TCHAR_TO_UTF8(*this->Path_MMProj), VLM_Params.bUseGPUForMMProj);
+			UE_LOG(LogTemp, Warning, TEXT("Vision Support: %s"), Cactus_Context->isMultimodalSupportVision() ? TEXT("Yes") : TEXT("No"));
 		}
 
 		return true;
@@ -167,36 +234,13 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, ImageData, ImageSize, Question, MaxTokens, World]()
 		{
 			std::vector<uint8_t> BGRA_Buffer = this->Cactus_Context->Convert_Array(ImageData);
+			std::vector<uint8_t> RGB_Buffer = this->Cactus_Context->BGRA_To_RGB(BGRA_Buffer);
 
-			if (this->Cactus_Context->Load_Image_Buffer(BGRA_Buffer, static_cast<uint32_t>(ImageSize.X), static_cast<uint32_t>(ImageSize.Y), true))
-			{
-				AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World]()
-					{
-						World->GetTimerManager().ClearTimer(this->Handle_Counter);
-						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to load image buffer !"), -1, -1, -1);
-					}
-				);
+			const std::string JsonMessage = this->JsonMaker(Question);
+			std::string FormattedPrompt = this->Cactus_Context->getFormattedChat(JsonMessage, "");
 
-				return;
-			}
-
-			// Prepare prompt (VLM format with image + question)
-			std::string Messages = R"([{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ")"
-				+ std::string(TCHAR_TO_UTF8(*Question)) + R"("}]}])";
-
-			std::string FormattedPrompt;
-			
-			try
-			{
-				FormattedPrompt = this->Cactus_Context->getFormattedChat(Messages, "");
-			}
-
-			catch (const std::exception& Exception)
-			{
-				FormattedPrompt = TCHAR_TO_UTF8(*Question);
-				UE_LOG(LogTemp, Error, TEXT("Exception occurred while formatting chat: %s"), UTF8_TO_TCHAR(Exception.what()));
-			}
-
+			UE_LOG(LogTemp, Warning, TEXT("Chat Template:\n%s"), UTF8_TO_TCHAR(Cactus_Context->last_chat_template.c_str()));
+			/*
 			this->Cactus_Context->params.prompt = FormattedPrompt;
 			this->Cactus_Context->params.n_predict = MaxTokens;
 
@@ -219,7 +263,7 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 			// Start completion
 			this->Cactus_Context->generated_text.clear();
 			this->Cactus_Context->beginCompletion();
-			this->Cactus_Context->loadPrompt({}); // Empty media_paths since we loaded buffer directly
+			this->Cactus_Context->loadPrompt(RGB_Buffer, ImageSize.X, ImageSize.Y); // Empty media_paths since we loaded buffer directly
 
 			auto StartTime = std::chrono::high_resolution_clock::now();
 			bool FirstToken = true;
@@ -258,6 +302,7 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 
 				}
 			);
+			*/
 		}
 	);
 }

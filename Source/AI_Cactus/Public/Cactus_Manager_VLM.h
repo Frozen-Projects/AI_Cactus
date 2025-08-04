@@ -29,6 +29,8 @@ private:
 	FTimerHandle Handle_Counter;
 	FTimerDelegate Delegate_Counter;
 
+	virtual std::string JsonMaker(const FString& Question) const;
+
 protected:
 
 	// Called when the game starts or when spawned.

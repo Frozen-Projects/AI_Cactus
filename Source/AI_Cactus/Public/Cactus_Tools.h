@@ -108,5 +108,5 @@ struct cactus_context_vlm : public cactus::cactus_context
 {
     std::vector<uint8_t> Convert_Array(TArray<uint8_t> ImageData);
     std::vector<uint8_t> BGRA_To_RGB(const std::vector<uint8_t>& ImageData);
-    bool Load_Image_Buffer(const std::vector<uint8_t>& Buffer, uint32_t Width, uint32_t Height, bool bIsDataBGRA);
+    void loadPrompt(const std::vector<uint8_t>& BufferRGB, int32 Width, int32 Height);
 };
