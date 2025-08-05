@@ -99,7 +99,7 @@ class chat_template {
             // fprintf(stderr, "try_raw_render: %s\n", prompt.c_str());
             return prompt;
         } catch (const std::exception & e) {
-			(void)e;  // Suppress unused variable warning in MSVC builds.
+            (void)e;  // Suppress unused variable warning in MSVC builds.
             // fprintf(stderr, "try_raw_render error: %s\n", e.what());
             return "";
         }

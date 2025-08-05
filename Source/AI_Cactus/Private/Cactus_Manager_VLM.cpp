@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Cactus_Manager_VLM.h"
 
@@ -34,48 +34,10 @@ void ACactus_Manager_VLM::Tick(float DeltaTime)
 
 std::string ACactus_Manager_VLM::JsonMaker(const FString& Question) const
 {
-	// --- Build "image" content ---
-	TSharedRef<FJsonObject> ImageObject = MakeShared<FJsonObject>();
-	ImageObject->Values.Empty(); // Ensure no extra hidden fields
-	ImageObject->SetStringField(TEXT("type"), TEXT("image"));
-
-	// --- Build "text" content ---
-	TSharedRef<FJsonObject> TextObject = MakeShared<FJsonObject>();
-	TextObject->Values.Empty(); // Ensure no extra hidden fields
-	TextObject->SetStringField(TEXT("type"), TEXT("text"));
-	TextObject->SetStringField(TEXT("text"), Question);
-
-	// --- Build "content" array ---
-	TArray<TSharedPtr<FJsonValue>> ContentArray;
-	ContentArray.Reserve(2);
-	ContentArray.Add(MakeShared<FJsonValueObject>(ImageObject));
-	ContentArray.Add(MakeShared<FJsonValueObject>(TextObject));
-
-	// --- Build "user" object ---
-	TSharedRef<FJsonObject> UserObject = MakeShared<FJsonObject>();
-	UserObject->Values.Empty(); // Ensure no extra hidden fields
-	UserObject->SetStringField(TEXT("role"), TEXT("user"));
-	UserObject->SetArrayField(TEXT("content"), ContentArray);
-
-	// --- Wrap in outer array ---
-	TArray<TSharedPtr<FJsonValue>> MessagesArray;
-	MessagesArray.Reserve(1);
-	MessagesArray.Add(MakeShared<FJsonValueObject>(UserObject));
-
-	// --- Serialize ---
-	FString OutputString;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
-	if (!FJsonSerializer::Serialize(MessagesArray, Writer))
-	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to serialize JSON for Cactus."));
-		return "";
-	}
-
-	// --- Convert to std::string ---
-	std::string MessagesStd = TCHAR_TO_UTF8(*OutputString);
-
-	// --- Log for debugging ---
-	UE_LOG(LogTemp, Log, TEXT("Conversation JSON String:\n%s"), *OutputString);
+	std::string JsonMessage =
+		"[{\"role\":\"user\",\"content\":[{\"type\":\"image\"},{\"type\":\"text\",\"text\":\"What do you see in this image ?\"}]}]";
+	
+	return JsonMessage;
 
 	/*
 	* Sample JSON Structure:
@@ -94,8 +56,6 @@ std::string ACactus_Manager_VLM::JsonMaker(const FString& Question) const
 		}
 	]
 	*/
-
-	return MessagesStd;
 }
 
 bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
@@ -134,7 +94,7 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 			return false;
 		}
 
-		if (!this->Path_MMProj.IsEmpty() && this->Path_MMProj != "MMPROJ_DISABLED")
+		if (!this->Path_MMProj.IsEmpty())
 		{
 			this->Cactus_Context->initMultimodal(TCHAR_TO_UTF8(*this->Path_MMProj), VLM_Params.bUseGPUForMMProj);
 			UE_LOG(LogTemp, Warning, TEXT("Vision Support: %s"), Cactus_Context->isMultimodalSupportVision() ? TEXT("Yes") : TEXT("No"));
@@ -152,19 +112,6 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 
 bool ACactus_Manager_VLM::SetModelPath(const FString& In_Path_Model, const FString& In_Path_MMProj)
 {
-	if (In_Path_MMProj.IsEmpty())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("MMProj path is empty !"));
-		return false;
-	}
-
-	if (In_Path_MMProj != "MMPROJ_DISABLED")
-	{
-		FString Temp_MMProj = In_Path_MMProj;
-		FPaths::MakePlatformFilename(Temp_MMProj);
-		this->Path_MMProj = Temp_MMProj;
-	}
-
 	if (In_Path_Model.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Model path is empty !"));
@@ -173,8 +120,15 @@ bool ACactus_Manager_VLM::SetModelPath(const FString& In_Path_Model, const FStri
 
 	FString TempPath = In_Path_Model;
 	FPaths::MakePlatformFilename(TempPath);
-
 	this->Path_Model = TempPath;
+
+	if (!In_Path_MMProj.IsEmpty())
+	{
+		FString Temp_MMProj = In_Path_MMProj;
+		FPaths::MakePlatformFilename(Temp_MMProj);
+		this->Path_MMProj = Temp_MMProj;
+	}
+
 	return true;
 }
 
@@ -233,14 +187,22 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, ImageData, ImageSize, Question, MaxTokens, World]()
 		{
-			std::vector<uint8_t> BGRA_Buffer = this->Cactus_Context->Convert_Array(ImageData);
-			std::vector<uint8_t> RGB_Buffer = this->Cactus_Context->BGRA_To_RGB(BGRA_Buffer);
+			// Prepare prompt (VLM format with image + question)
+			std::string Messages = R"([{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ")" + std::string(TCHAR_TO_UTF8(*Question)) + R"("}]}])";
 
-			const std::string JsonMessage = this->JsonMaker(Question);
-			std::string FormattedPrompt = this->Cactus_Context->getFormattedChat(JsonMessage, "");
+			std::string FormattedPrompt;
 
-			UE_LOG(LogTemp, Warning, TEXT("Chat Template:\n%s"), UTF8_TO_TCHAR(Cactus_Context->last_chat_template.c_str()));
-			/*
+			try
+			{
+				FormattedPrompt = this->Cactus_Context->getFormattedChat(Messages, "");
+			}
+
+			catch (const std::exception& Exception)
+			{
+				FormattedPrompt = TCHAR_TO_UTF8(*Question);
+				UE_LOG(LogTemp, Error, TEXT("Exception occurred while formatting chat: %s"), UTF8_TO_TCHAR(Exception.what()));
+			}
+
 			this->Cactus_Context->params.prompt = FormattedPrompt;
 			this->Cactus_Context->params.n_predict = MaxTokens;
 
@@ -263,7 +225,7 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 			// Start completion
 			this->Cactus_Context->generated_text.clear();
 			this->Cactus_Context->beginCompletion();
-			this->Cactus_Context->loadPrompt(RGB_Buffer, ImageSize.X, ImageSize.Y); // Empty media_paths since we loaded buffer directly
+			this->Cactus_Context->loadPrompt({}); // Empty media_paths since we loaded buffer directly
 
 			auto StartTime = std::chrono::high_resolution_clock::now();
 			bool FirstToken = true;
@@ -273,7 +235,7 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 			while (this->Cactus_Context->has_next_token && !this->Cactus_Context->is_interrupted)
 			{
 				const cactus::completion_token_output Token_Output = this->Cactus_Context->doCompletion();
-				
+
 				if (Token_Output.tok == -1)
 				{
 					break;
@@ -302,7 +264,6 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 
 				}
 			);
-			*/
 		}
 	);
 }

@@ -21,4 +21,5 @@ THIRD_PARTY_INCLUDES_START
 
 #include "cactus.h"
 #include "tools/mtmd/mtmd.h"
+#include "json.hpp"
 THIRD_PARTY_INCLUDES_END

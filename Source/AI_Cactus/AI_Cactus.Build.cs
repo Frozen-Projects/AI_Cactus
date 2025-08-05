@@ -36,8 +36,9 @@ public class AI_Cactus : ModuleRules
 			{
 				"Core",
                 "OpenSSL",
-                "libcurl"
-			}
+                "libcurl",
+                "nlohmann_json",
+            }
 			);
 				
 		PrivateDependencyModuleNames.AddRange(
