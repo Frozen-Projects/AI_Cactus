@@ -104,9 +104,24 @@ struct AI_CACTUS_API FCactusModelParams_VLM
 	}
 };
 
-struct cactus_context_vlm : public cactus::cactus_context
+class FVirtualFileMapping
 {
-    std::vector<uint8_t> Convert_Array(TArray<uint8_t> ImageData);
-    std::vector<uint8_t> BGRA_To_RGB(const std::vector<uint8_t>& ImageData);
-    void loadPrompt(const std::vector<uint8_t>& BufferRGB, int32 Width, int32 Height);
+
+private:
+
+    HANDLE MappingHandle = nullptr;
+    void* MappedMemory = nullptr;
+    SIZE_T MappedSize = 0;
+
+public:
+
+    FVirtualFileMapping();
+    ~FVirtualFileMapping();
+
+    void Cleanup();
+    void* GetData() const;
+    SIZE_T GetSize() const;
+
+    virtual bool CreateVirtualImageFile(const TArray<uint8>& ImageBuffer, FVector2D ImageRes, const FString& InPath);
+
 };

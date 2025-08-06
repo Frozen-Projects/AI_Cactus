@@ -86,7 +86,7 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 		this->Cactus_Params.n_gpu_layers = VLM_Params.GPULayers;
 		this->Cactus_Params.cpuparams.n_threads = VLM_Params.CPUThreads;
 
-		this->Cactus_Context = MakeShared<cactus_context_vlm, ESPMode::ThreadSafe>();
+		this->Cactus_Context = MakeShared<cactus_context, ESPMode::ThreadSafe>();
 
 		if (!this->Cactus_Context->loadModel(this->Cactus_Params))
 		{
@@ -188,13 +188,14 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, ImageData, ImageSize, Question, MaxTokens, World]()
 		{
 			// Prepare prompt (VLM format with image + question)
-			std::string Messages = R"([{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ")" + std::string(TCHAR_TO_UTF8(*Question)) + R"("}]}])";
+			const std::string prompt = "What is this image ?";
+			std::string messages = R"([{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ")" + prompt + R"("}]}])";
 
 			std::string FormattedPrompt;
 
 			try
 			{
-				FormattedPrompt = this->Cactus_Context->getFormattedChat(Messages, "");
+				FormattedPrompt = this->Cactus_Context->getFormattedChat(messages, "");
 			}
 
 			catch (const std::exception& Exception)
