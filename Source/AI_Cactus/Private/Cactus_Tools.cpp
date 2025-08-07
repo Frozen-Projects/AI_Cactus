@@ -1,17 +1,5 @@
 ﻿#include "Cactus_Tools.h"
 
-static std::string fnv_hash(const uint8_t* data, size_t len) 
-{
-    const uint64_t fnv_prime = 0x100000001b3ULL;
-    uint64_t hash = 0xcbf29ce484222325ULL;
-
-    for (size_t i = 0; i < len; ++i) {
-        hash ^= data[i];
-        hash *= fnv_prime;
-    }
-    return std::to_string(hash);
-}
-
 FVirtualFileMapping::FVirtualFileMapping()
 {
 
@@ -20,6 +8,16 @@ FVirtualFileMapping::FVirtualFileMapping()
 FVirtualFileMapping::~FVirtualFileMapping()
 {
 	this->Cleanup();
+}
+
+std::string FVirtualFileMapping::GetErrorString(DWORD ErrorCode)
+{
+    char* msgBuffer = nullptr;
+    size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, nullptr, ErrorCode, 0, (LPSTR)&msgBuffer, 0, nullptr);
+
+    std::string message(msgBuffer, size);
+    LocalFree(msgBuffer);
+    return message;
 }
 
 void FVirtualFileMapping::Cleanup()
@@ -44,12 +42,12 @@ void* FVirtualFileMapping::GetData() const
     return MappedMemory;
 }
 
-SIZE_T FVirtualFileMapping::GetSize() const
+size_t FVirtualFileMapping::GetSize() const
 {
     return MappedSize;
 }
 
-bool FVirtualFileMapping::CreateVirtualImageFile(const TArray<uint8>& ImageBuffer, FVector2D ImageRes, const FString& InPath)
+bool FVirtualFileMapping::CreateVirtualImageFile(const TArray<uint8>& ImageBuffer, FVector2D ImageRes, FName FileName)
 {
     if (ImageBuffer.IsEmpty())
     {
@@ -61,18 +59,28 @@ bool FVirtualFileMapping::CreateVirtualImageFile(const TArray<uint8>& ImageBuffe
         return false;
     }
 
-    if (InPath.IsEmpty())
+	FString NameString = FileName.ToString();
+
+    if (NameString.IsEmpty())
     {
         return false;
     }
 
-    const wchar_t* Path = *InPath;
+	const FString VirtualPath = "Local\\" + NameString;
+
+    const wchar_t* Path = *VirtualPath;
 	const size_t BufferSize = ImageBuffer.Num();
+	//UE_LOG(LogTemp, Warning, TEXT("BufferSize :%d"), static_cast<int32>(BufferSize));
+
     this->MappingHandle = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, static_cast<DWORD>(BufferSize), Path);
 
     if (!this->MappingHandle)
     {
-        UE_LOG(LogTemp, Error, TEXT("Failed to create file mapping: %s"), *InPath);
+		FString ErrorTitle = "Failed to create file mapping at: " + VirtualPath + " : ";
+        
+        std::stringstream ErrorStream;
+        ErrorStream << TCHAR_TO_UTF8(*ErrorTitle) << this->GetErrorString(GetLastError());
+        UE_LOG(LogTemp, Error, TEXT("%s"), *FString(ErrorStream.str().c_str()));
         
         this->Cleanup();
         return false;
@@ -83,7 +91,7 @@ bool FVirtualFileMapping::CreateVirtualImageFile(const TArray<uint8>& ImageBuffe
     if (!this->MappedMemory)
     {
         std::stringstream ErrorStream;
-        ErrorStream << "MapViewOfFile failed: " << GetLastError();
+        ErrorStream << "MapViewOfFile failed: " << this->GetErrorString(GetLastError());
         UE_LOG(LogTemp, Error, TEXT("%s"), *FString(ErrorStream.str().c_str()));
 		
         this->Cleanup();
@@ -91,6 +99,43 @@ bool FVirtualFileMapping::CreateVirtualImageFile(const TArray<uint8>& ImageBuffe
     }
 
     FMemory::Memcpy(this->MappedMemory, ImageBuffer.GetData(), BufferSize);
+	this->MappedSize = BufferSize;
 
     return true;
+}
+
+UCactusImage::UCactusImage()
+{
+	this->CactusImageMapping = new FVirtualFileMapping();
+}
+
+void UCactusImage::BeginDestroy()
+{
+    if (this->CactusImageMapping)
+    {
+        delete this->CactusImageMapping;
+        this->CactusImageMapping = nullptr;
+    }
+
+    Super::BeginDestroy();
+}
+
+TArray<uint8> UCactusImage::GetVirtualData()
+{
+    if (!this->CactusImageMapping)
+    {
+        return TArray<uint8>();
+    }
+
+    if (!this->CactusImageMapping->GetData())
+    {
+        return TArray<uint8>();
+    }
+
+    TArray<uint8> Result;
+    SIZE_T Size = this->CactusImageMapping->GetSize();
+    Result.SetNumUninitialized(Size);
+    FMemory::Memcpy(Result.GetData(), this->CactusImageMapping->GetData(), Size);
+
+    return Result;
 }

@@ -268,3 +268,9 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 		}
 	);
 }
+
+void ACactus_Manager_VLM::TestVirtualFile(UCactusImage*& OutImage, TArray<uint8> ImageData, FVector2D ImageRes, FName FileName)
+{
+	OutImage = NewObject<UCactusImage>();
+	OutImage->CactusImageMapping->CreateVirtualImageFile(ImageData, ImageRes, FileName);
+}

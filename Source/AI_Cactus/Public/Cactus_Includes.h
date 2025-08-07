@@ -16,7 +16,7 @@ THIRD_PARTY_INCLUDES_START
 #ifdef _WIN64
 #define WIN32_LEAN_AND_MEAN
 #include "Windows/AllowWindowsPlatformTypes.h"
-#include <windows.h>
+#include <memoryapi.h>
 #include "Windows/HideWindowsPlatformTypes.h"
 #endif
 

@@ -111,17 +111,39 @@ private:
 
     HANDLE MappingHandle = nullptr;
     void* MappedMemory = nullptr;
-    SIZE_T MappedSize = 0;
+    size_t MappedSize = 0;
+    
+    virtual std::string GetErrorString(DWORD ErrorCode);
 
 public:
 
     FVirtualFileMapping();
-    ~FVirtualFileMapping();
+    virtual ~FVirtualFileMapping();
 
     void Cleanup();
     void* GetData() const;
     SIZE_T GetSize() const;
 
-    virtual bool CreateVirtualImageFile(const TArray<uint8>& ImageBuffer, FVector2D ImageRes, const FString& InPath);
+    virtual bool CreateVirtualImageFile(const TArray<uint8>& ImageBuffer, FVector2D ImageRes, FName FileName);
+
+};
+
+UCLASS(BlueprintType)
+class AI_CACTUS_API UCactusImage : public UObject
+{
+    GENERATED_BODY()
+
+public:
+
+    UCactusImage();
+
+    // ~UCactusImage start.
+    void BeginDestroy();
+    // ~UCactusImage finish.
+
+    FVirtualFileMapping* CactusImageMapping = nullptr;
+
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+    virtual TArray<uint8> GetVirtualData();
 
 };
