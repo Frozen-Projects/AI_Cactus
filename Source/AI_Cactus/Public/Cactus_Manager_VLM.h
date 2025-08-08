@@ -63,6 +63,9 @@ public:
 	virtual FString GetMMProjPath() const;
 
 	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-	virtual void GenerateResponseToImage(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question, int32 MaxTokens = 50);
+	virtual void Response_Image_Path(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, FString FilePath, const FString& Question, int32 MaxTokens = 50);
+
+	//UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual void Response_Image_Buffer(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question, int32 MaxTokens = 50);
 
 };

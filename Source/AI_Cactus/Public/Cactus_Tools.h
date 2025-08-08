@@ -103,29 +103,3 @@ struct AI_CACTUS_API FCactusModelParams_VLM
         return ContextSize > 0 && BatchSize > 0 && GPULayers > 0 && CPUThreads > 0;
 	}
 };
-
-class UCactusVirtualFile
-{
-
-private:
-
-    HANDLE MappingHandle = nullptr;
-    void* MappedMemory = nullptr;
-    size_t MappedSize = 0;
-	FString VirtualFilePath;
-    
-    virtual std::string GetErrorString(DWORD ErrorCode);
-
-public:
-
-    UCactusVirtualFile();
-    virtual ~UCactusVirtualFile();
-
-    void Cleanup();
-    void* GetData() const;
-    SIZE_T GetSize() const;
-    FString GetFilePath();
-
-    virtual bool CreateVirtualFile(const TArray<uint8>& Buffer, FVector2D ImageRes, FName FileName);
-
-};
