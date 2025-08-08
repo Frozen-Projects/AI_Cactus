@@ -110,8 +110,10 @@ bool ACactus_Manager_VLM::Init_Cactus(FCactusModelParams_VLM VLM_Params)
 
 		if (!this->Path_MMProj.IsEmpty())
 		{
-			this->Cactus_Context->initMultimodal(TCHAR_TO_UTF8(*this->Path_MMProj), VLM_Params.bUseGPUForMMProj);
-			UE_LOG(LogTemp, Warning, TEXT("Vision Support: %s"), Cactus_Context->isMultimodalSupportVision() ? TEXT("Yes") : TEXT("No"));
+			if (!this->Cactus_Context->initMultimodal(TCHAR_TO_UTF8(*this->Path_MMProj), VLM_Params.bUseGPUForMMProj))
+			{
+				UE_LOG(LogTemp, Error, TEXT("Model doesn't support multi-modal !"));
+			}
 		}
 
 		return true;
@@ -170,20 +172,6 @@ void ACactus_Manager_VLM::Response_Image_Path(FDelegateCactus DelegateCactus, FD
 		return;
 	}
 
-	FPaths::MakeStandardFilename(FilePath);
-
-	if (FilePath.IsEmpty())
-	{
-		DelegateCactus.ExecuteIfBound(false, TEXT("File path is empty !"), -1, -1, -1);
-		return;
-	}
-
-	if (!FPaths::FileExists(FilePath))
-	{
-		DelegateCactus.ExecuteIfBound(false, TEXT("File does not exist at the specified path!"), -1, -1, -1);
-		return;
-	}
-
 	UWorld* World = GEngine->GetCurrentPlayWorld();
 
 	if (!IsValid(World))
@@ -201,11 +189,20 @@ void ACactus_Manager_VLM::Response_Image_Path(FDelegateCactus DelegateCactus, FD
 
 	World->GetTimerManager().SetTimer(this->Handle_Counter, this->Delegate_Counter, 1.0f, true);
 
+	FPaths::MakeStandardFilename(FilePath);
+
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, FilePath, Question, MaxTokens, World]()
 		{
 			FString TempPath = FilePath;
 			FPaths::MakePlatformFilename(TempPath);
 			const std::string PathString = TCHAR_TO_UTF8(*TempPath);
+
+			std::vector<std::string> ImagePaths;
+
+			if (FPaths::FileExists(FilePath))
+			{
+				ImagePaths.push_back(PathString);
+			}
 
 			/*
 			* Process the image data and prepare the prompt for the model.
@@ -248,7 +245,7 @@ void ACactus_Manager_VLM::Response_Image_Path(FDelegateCactus DelegateCactus, FD
 			// Start completion
 			this->Cactus_Context->generated_text.clear();
 			this->Cactus_Context->beginCompletion();
-			this->Cactus_Context->loadPrompt({ PathString });
+			this->Cactus_Context->loadPrompt(ImagePaths);
 
 			const std::chrono::steady_clock::time_point StartTime = std::chrono::high_resolution_clock::now();
 			bool FirstToken = true;
@@ -309,20 +306,6 @@ void ACactus_Manager_VLM::Conversation_Image_Path(FDelegateCactus DelegateCactus
 		return;
 	}
 
-	FPaths::MakeStandardFilename(FilePath);
-
-	if (FilePath.IsEmpty())
-	{
-		DelegateCactus.ExecuteIfBound(false, TEXT("File path is empty !"), -1, -1, -1);
-		return;
-	}
-
-	if (!FPaths::FileExists(FilePath))
-	{
-		DelegateCactus.ExecuteIfBound(false, TEXT("File does not exist at the specified path!"), -1, -1, -1);
-		return;
-	}
-
 	if (Assistant_Marker.IsEmpty())
 	{
 		DelegateCactus.ExecuteIfBound(false, TEXT("Assistant_Marker is empty !"), -1, -1, -1);
@@ -347,11 +330,20 @@ void ACactus_Manager_VLM::Conversation_Image_Path(FDelegateCactus DelegateCactus
 
 	World->GetTimerManager().SetTimer(this->Handle_Counter, this->Delegate_Counter, 1.0f, true);
 
+	FPaths::MakeStandardFilename(FilePath);
+
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, FilePath, Question, MaxTokens, Assistant_Marker, World]()
 		{
 			FString TempPath = FilePath;
 			FPaths::MakePlatformFilename(TempPath);
-			const std::string ImagePath = TCHAR_TO_UTF8(*TempPath);
+			const std::string PathString = TCHAR_TO_UTF8(*TempPath);
+
+			std::vector<std::string> ImagePaths;
+
+			if (FPaths::FileExists(FilePath))
+			{
+				ImagePaths.push_back(PathString);
+			}
 
 			std::string JsonMessage;
 			std::string Prompt;
@@ -405,7 +397,7 @@ void ACactus_Manager_VLM::Conversation_Image_Path(FDelegateCactus DelegateCactus
 			}
 
 			this->Cactus_Context->beginCompletion();
-			this->Cactus_Context->loadPrompt({ ImagePath });
+			this->Cactus_Context->loadPrompt(ImagePaths);
 
 			const auto StartTime = std::chrono::high_resolution_clock::now();
 			bool FirstToken = true;
