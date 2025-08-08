@@ -104,7 +104,7 @@ struct AI_CACTUS_API FCactusModelParams_VLM
 	}
 };
 
-class FVirtualFileMapping
+class UCactusVirtualFile
 {
 
 private:
@@ -112,38 +112,20 @@ private:
     HANDLE MappingHandle = nullptr;
     void* MappedMemory = nullptr;
     size_t MappedSize = 0;
+	FString VirtualFilePath;
     
     virtual std::string GetErrorString(DWORD ErrorCode);
 
 public:
 
-    FVirtualFileMapping();
-    virtual ~FVirtualFileMapping();
+    UCactusVirtualFile();
+    virtual ~UCactusVirtualFile();
 
     void Cleanup();
     void* GetData() const;
     SIZE_T GetSize() const;
+    FString GetFilePath();
 
-    virtual bool CreateVirtualImageFile(const TArray<uint8>& ImageBuffer, FVector2D ImageRes, FName FileName);
-
-};
-
-UCLASS(BlueprintType)
-class AI_CACTUS_API UCactusImage : public UObject
-{
-    GENERATED_BODY()
-
-public:
-
-    UCactusImage();
-
-    // ~UCactusImage start.
-    void BeginDestroy();
-    // ~UCactusImage finish.
-
-    FVirtualFileMapping* CactusImageMapping = nullptr;
-
-	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
-    virtual TArray<uint8> GetVirtualData();
+    virtual bool CreateVirtualFile(const TArray<uint8>& Buffer, FVector2D ImageRes, FName FileName);
 
 };

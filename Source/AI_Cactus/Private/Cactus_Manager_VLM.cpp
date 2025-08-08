@@ -187,7 +187,35 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 
 	AsyncTask(ENamedThreads::AnyNormalThreadHiPriTask, [this, DelegateCactus, DelegateCounter, ImageData, ImageSize, Question, MaxTokens, World]()
 		{
-			// Prepare prompt (VLM format with image + question)
+			/*
+			* Generate a virtual file for the image data.
+			*/
+
+			UCactusVirtualFile* VirtualFile = new UCactusVirtualFile();
+			const int64 Timestamp = FDateTime::Now().GetTicks();
+			const FName FileName = FName(*FString::Printf(TEXT("CactusImage_%lld"), Timestamp));
+
+			if (!VirtualFile->CreateVirtualFile(ImageData, ImageSize, FileName))
+			{
+				delete VirtualFile;
+				VirtualFile = nullptr;
+
+				AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World]()
+					{
+						World->GetTimerManager().ClearTimer(this->Handle_Counter);
+						DelegateCactus.ExecuteIfBound(false, TEXT("Failed to create virtual file for image!"), -1, -1, -1);
+					}
+				);
+				delete VirtualFile;
+				return;
+			}
+
+			const FString VirtualFilePath = VirtualFile->GetFilePath();
+
+			/*
+			* Process the image data and prepare the prompt for the model.
+			*/
+
 			const std::string prompt = "What is this image ?";
 			std::string messages = R"([{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ")" + prompt + R"("}]}])";
 
@@ -210,6 +238,9 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 			// Init sampling
 			if (!this->Cactus_Context->initSampling())
 			{
+				delete VirtualFile;
+				VirtualFile = nullptr;
+				
 				AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World]()
 					{
 						World->GetTimerManager().ClearTimer(this->Handle_Counter);
@@ -258,6 +289,13 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 
 			FString Result = UTF8_TO_TCHAR(this->Cactus_Context->generated_text.c_str());
 
+			/*
+			* Cleanup up virtual file.
+			*/
+
+			delete VirtualFile;
+			VirtualFile = nullptr;
+
 			AsyncTask(ENamedThreads::GameThread, [this, DelegateCactus, World, Result, TotalTime, TTFT, NumTokens]()
 				{
 					World->GetTimerManager().ClearTimer(this->Handle_Counter);
@@ -267,10 +305,4 @@ void ACactus_Manager_VLM::GenerateResponseToImage(FDelegateCactus DelegateCactus
 			);
 		}
 	);
-}
-
-void ACactus_Manager_VLM::TestVirtualFile(UCactusImage*& OutImage, TArray<uint8> ImageData, FVector2D ImageRes, FName FileName)
-{
-	OutImage = NewObject<UCactusImage>();
-	OutImage->CactusImageMapping->CreateVirtualImageFile(ImageData, ImageRes, FileName);
 }
