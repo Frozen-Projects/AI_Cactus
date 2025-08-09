@@ -71,4 +71,10 @@ public:
 	//UFUNCTION(BlueprintCallable, Category = "AI Cactus")
 	virtual void Response_Image_Buffer(FDelegateCactus DelegateCactus, FDelegateCactusCounter DelegateCounter, TArray<uint8> ImageData, FVector2D ImageSize, const FString& Question, int32 MaxTokens = 50);
 
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual void ExportConversation(FDelegateCactusSave DelegateSave, const FString& SavePath);
+
+	UFUNCTION(BlueprintCallable, Category = "AI Cactus")
+	virtual void ImportConversation(FDelegateCactusSave DelegateLoad, const FString& FilePath, const FString& Assistant_Marker = "<|im_start|>assistant");
+
 };
