@@ -7,7 +7,7 @@ namespace UnrealBuildTool.Rules
         public nlohmann_json(ReadOnlyTargetRules Target) : base(Target)
         {
     		Type = ModuleType.External;
-            UndefinedIdentifierWarningLevel = WarningLevel.Off;
+            CppCompileWarningSettings.UndefinedIdentifierWarningLevel = WarningLevel.Off;
             bEnableExceptions = true;
 
             if (Target.Platform == UnrealTargetPlatform.Win64)
